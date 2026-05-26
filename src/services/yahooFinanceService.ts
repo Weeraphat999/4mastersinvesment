@@ -258,3 +258,49 @@ export async function searchTickers(query: string): Promise<YahooSearchResult[]>
 
   return results;
 }
+
+// --- Profile data from serverless proxy ---
+
+export interface YahooProfileData {
+  symbol: string;
+  shortName: string;
+  longName: string;
+  sector: string;
+  industry: string;
+  marketCap: number;
+  regularMarketPrice: number;
+  regularMarketChangePercent: number;
+  fiftyTwoWeekLow: number;
+  fiftyTwoWeekHigh: number;
+  trailingPE: number;
+  forwardPE: number;
+  pegRatio: number;
+  priceToBook: number;
+  profitMargins: number;
+  debtToEquity: number;
+  returnOnEquity: number;
+  revenueGrowth: number;
+  totalRevenue: number;
+  totalDebt: number;
+  totalCash: number;
+  operatingCashflow: number;
+  freeCashflow: number;
+}
+
+/**
+ * Fetches detailed company profile via serverless proxy.
+ * Includes sector, market cap, financial ratios, etc.
+ */
+export async function fetchProfile(ticker: string): Promise<YahooProfileData | null> {
+  const normalizedTicker = normalizeTicker(ticker);
+
+  try {
+    const response = await fetch(`/api/profile?ticker=${normalizedTicker}`);
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    return data as YahooProfileData;
+  } catch {
+    return null;
+  }
+}

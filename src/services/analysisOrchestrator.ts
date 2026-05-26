@@ -7,8 +7,8 @@
  */
 
 import * as cacheLayer from './cacheLayer';
-import { fetchQuote, fetchHistorical } from './yahooFinanceService';
-import type { YahooQuoteResponse, YahooHistoricalPoint } from './yahooFinanceService';
+import { fetchQuote, fetchHistorical, fetchProfile } from './yahooFinanceService';
+import type { YahooQuoteResponse, YahooHistoricalPoint, YahooProfileData } from './yahooFinanceService';
 import { fetchFinancials, fetchOverview, isRateLimited } from './alphaVantageService';
 import type { AlphaVantageFinancials, AlphaVantageOverview } from './alphaVantageService';
 import { fetchFmpProfile, fetchFmpFinancials, fetchFmpQuote, fetchFmpHistorical, isFmpConfigured } from './fmpService';
@@ -76,6 +76,7 @@ export async function analyzeStock(
   let overviewData: AlphaVantageOverview | null = null;
   let indicatorsData: IndicatorResults | null = null;
   let fmpProfileData: FmpProfile | null = null;
+  let yahooProfileData: YahooProfileData | null = null;
 
   // Helper to report progress
   function reportProgress(currentStageIndex: number): void {
@@ -187,84 +188,98 @@ export async function analyzeStock(
       fmpProfileData = cachedFmpProfile;
       dataSource.financialsSource = 'cached';
     } else {
-      // Try FMP first (primary source — 250 requests/day)
-      let fmpSuccess = false;
+      // Try Yahoo Profile via serverless proxy first (most reliable)
+      yahooProfileData = await fetchProfile(normalizedTicker);
 
-      if (isFmpConfigured()) {
-        const [fmpProfile, fmpFinancials] = await Promise.all([
-          fetchFmpProfile(normalizedTicker),
-          fetchFmpFinancials(normalizedTicker),
-        ]);
+      if (yahooProfileData && yahooProfileData.marketCap > 0) {
+        // Map Yahoo profile to AlphaVantageOverview format
+        overviewData = {
+          Symbol: yahooProfileData.symbol,
+          Name: yahooProfileData.longName || yahooProfileData.shortName,
+          Sector: yahooProfileData.sector,
+          MarketCapitalization: String(yahooProfileData.marketCap),
+          PERatio: String(yahooProfileData.trailingPE || yahooProfileData.forwardPE || 0),
+          ProfitMargin: String(yahooProfileData.profitMargins || 0),
+          DebtToEquityRatio: String(yahooProfileData.debtToEquity || 0),
+          PEGRatio: String(yahooProfileData.pegRatio || 0),
+          PriceToSalesRatioTTM: yahooProfileData.totalRevenue > 0
+            ? String(yahooProfileData.marketCap / yahooProfileData.totalRevenue)
+            : '0',
+        };
 
-        if (fmpProfile || fmpFinancials) {
-          // Map FMP data to Alpha Vantage format for the existing pipeline
-          const mapped = mapFmpToRawApiData(fmpProfile, fmpFinancials);
-          fmpProfileData = fmpProfile;
-
-          // Only mark FMP as fully successful if we got actual financials
-          // FMP free tier only provides profile, not financial statements
-          if (fmpFinancials) {
-            financialsData = mapped.financials;
-            overviewData = mapped.overview;
-            fmpSuccess = true;
-            dataSource.financialsSource = 'live';
-          } else {
-            // FMP gave us profile only — still need Alpha Vantage for financials
-            // Keep fmpProfileData for supplementary info but don't skip AV
-            fmpSuccess = false;
+        // Also update quoteData with more accurate info from profile
+        if (quoteData) {
+          quoteData.marketCap = yahooProfileData.marketCap;
+          quoteData.sector = yahooProfileData.sector;
+          if (yahooProfileData.regularMarketPrice > 0) {
+            quoteData.regularMarketPrice = yahooProfileData.regularMarketPrice;
+            quoteData.regularMarketChangePercent = yahooProfileData.regularMarketChangePercent;
           }
+          if (yahooProfileData.fiftyTwoWeekLow > 0) {
+            quoteData.fiftyTwoWeekLow = yahooProfileData.fiftyTwoWeekLow;
+            quoteData.fiftyTwoWeekHigh = yahooProfileData.fiftyTwoWeekHigh;
+          }
+          quoteData.longName = yahooProfileData.longName;
+          quoteData.shortName = yahooProfileData.shortName || quoteData.shortName;
+        }
 
-          // Cache successful results
-          if (financialsData) {
-            cacheLayer.set(normalizedTicker, 'financials', financialsData);
-          }
-          if (overviewData) {
-            cacheLayer.set(normalizedTicker, 'overview', overviewData);
-          }
-          if (fmpProfileData) {
-            cacheLayer.set(normalizedTicker, 'fmpProfile', fmpProfileData);
+        cacheLayer.set(normalizedTicker, 'overview', overviewData);
+        dataSource.financialsSource = 'live';
+        stages[2].status = 'success';
+      } else {
+        // Fallback: Try FMP then Alpha Vantage
+        let fmpSuccess = false;
+
+        if (isFmpConfigured()) {
+          const [fmpProfile, fmpFinancials] = await Promise.all([
+            fetchFmpProfile(normalizedTicker),
+            fetchFmpFinancials(normalizedTicker),
+          ]);
+
+          if (fmpProfile || fmpFinancials) {
+            const mapped = mapFmpToRawApiData(fmpProfile, fmpFinancials);
+            fmpProfileData = fmpProfile;
+
+            if (fmpFinancials) {
+              financialsData = mapped.financials;
+              overviewData = mapped.overview;
+              fmpSuccess = true;
+              dataSource.financialsSource = 'live';
+            }
+
+            if (financialsData) cacheLayer.set(normalizedTicker, 'financials', financialsData);
+            if (overviewData) cacheLayer.set(normalizedTicker, 'overview', overviewData);
+            if (fmpProfileData) cacheLayer.set(normalizedTicker, 'fmpProfile', fmpProfileData);
           }
         }
-      }
 
-      // Fall back to Alpha Vantage if FMP failed, had no financials, or key is missing
-      if (!fmpSuccess) {
-        const [fetchedFinancials, fetchedOverview] = await Promise.all([
-          fetchFinancials(normalizedTicker),
-          fetchOverview(normalizedTicker),
-        ]);
+        if (!fmpSuccess) {
+          const [fetchedFinancials, fetchedOverview] = await Promise.all([
+            fetchFinancials(normalizedTicker),
+            fetchOverview(normalizedTicker),
+          ]);
 
-        // Check for rate limiting in the responses
-        if (fetchedFinancials === null && fetchedOverview === null) {
-          // Both returned null — could be rate limited or no API key
-          dataSource.financialsSource = 'fallback';
-          stages[2].status = 'warning';
+          if (fetchedFinancials === null && fetchedOverview === null) {
+            dataSource.financialsSource = 'fallback';
+            stages[2].status = 'warning';
+          } else {
+            financialsData = fetchedFinancials;
+            overviewData = fetchedOverview;
+            dataSource.financialsSource = 'live';
+            if (financialsData) cacheLayer.set(normalizedTicker, 'financials', financialsData);
+            if (overviewData) cacheLayer.set(normalizedTicker, 'overview', overviewData);
+            stages[2].status = 'success';
+          }
         } else {
-          financialsData = fetchedFinancials;
-          overviewData = fetchedOverview;
-          dataSource.financialsSource = 'live';
-
-          // Cache successful results
-          if (financialsData) {
-            cacheLayer.set(normalizedTicker, 'financials', financialsData);
-          }
-          if (overviewData) {
-            cacheLayer.set(normalizedTicker, 'overview', overviewData);
-          }
-
           stages[2].status = 'success';
         }
-      } else {
-        stages[2].status = 'success';
       }
     }
 
-    // If we didn't already set status above
     if (stages[2].status === 'loading') {
       stages[2].status = 'success';
     }
   } catch (error: unknown) {
-    // Detect rate limiting from the error
     if (isRateLimited(error)) {
       _rateLimitDetected = true;
     }
