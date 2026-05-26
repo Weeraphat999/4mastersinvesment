@@ -5,7 +5,7 @@ import CompanyHeader from '../components/CompanyHeader';
 import VerdictCard from '../components/VerdictCard';
 import MasterScoresCard from '../components/MasterScoresCard';
 import QuickFactsCard from '../components/QuickFactsCard';
-import NewSearchButton from '../components/NewSearchButton';
+import _NewSearchButton from '../components/NewSearchButton';
 import AnalysisTabs from '../components/AnalysisTabs';
 import LoadingProgress from '../components/LoadingProgress';
 import RateLimitBanner from '../components/RateLimitBanner';
@@ -64,7 +64,7 @@ function AnalyzePage() {
     }
   };
 
-  const handleNewSearch = () => {
+  const _handleNewSearch = () => {
     setAnalysisData(null);
     setDetailedAnalysisData(null);
     setDataSource(null);

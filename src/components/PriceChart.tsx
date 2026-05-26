@@ -54,7 +54,10 @@ const PriceChart: React.FC<PriceChartProps> = ({
 
   const formatYAxis = (value: number) => `$${value.toFixed(0)}`;
 
-  const formatTooltip = (value: number) => [`$${value.toFixed(2)}`, 'Price'];
+  const formatTooltip = (value: unknown) => {
+    const numValue = Number(value);
+    return [`$${isNaN(numValue) ? '0.00' : numValue.toFixed(2)}`, 'Price'];
+  };
 
   return (
     <div className="w-full bg-gray-800 rounded-lg p-4" role="img" aria-label="Price chart with support and resistance levels">

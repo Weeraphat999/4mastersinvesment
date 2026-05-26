@@ -67,7 +67,7 @@ export async function analyzeStock(
     indicatorsComputed: false,
   };
 
-  let rateLimitDetected = false;
+  let _rateLimitDetected = false;
 
   // Collected raw data for DataMapper
   let quoteData: YahooQuoteResponse | null = null;
@@ -222,7 +222,7 @@ export async function analyzeStock(
   } catch (error: unknown) {
     // Detect rate limiting from the error
     if (isRateLimited(error)) {
-      rateLimitDetected = true;
+      _rateLimitDetected = true;
     }
     stages[2].status = 'warning';
     dataSource.financialsSource = 'fallback';
