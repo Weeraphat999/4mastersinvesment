@@ -941,6 +941,25 @@ export function mapToAnalysisResult(ticker: string, raw: RawApiData): AnalysisRe
   // Start with fallback as the base
   const result: AnalysisResult = { ...fallback };
 
+  // CRITICAL: If we have real quote data, override the placeholder quickFacts
+  // with "N/A" for fields we don't have real data for
+  const hasRealQuote = raw.quote && raw.quote.regularMarketPrice > 0;
+  const hasRealOverview = raw.overview && raw.overview.Sector !== '';
+
+  if (hasRealQuote && !hasRealOverview) {
+    // We have quote but no overview — clear placeholder quickFacts
+    result.quickFacts = {
+      marketCap: 'N/A',
+      priceSales: 'N/A',
+      cashRunway: 'N/A',
+      sector: 'N/A',
+      weekRange52: 'N/A',
+      moat: 'N/A',
+      profitMargin: 'N/A',
+      debtEquity: 'N/A',
+    };
+  }
+
   // Map Yahoo quote data
   if (raw.quote) {
     result.price = raw.quote.regularMarketPrice;
