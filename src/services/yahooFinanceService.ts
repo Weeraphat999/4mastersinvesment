@@ -1,7 +1,7 @@
 /**
  * Yahoo Finance API client.
- * Fetches stock quotes, historical prices, and ticker search results
- * via CORS proxies. No API key required.
+ * Uses Vercel serverless functions as proxy (no CORS issues).
+ * Falls back to direct CORS proxy for local development.
  */
 
 // --- Constants ---
@@ -13,6 +13,15 @@ const CORS_PROXIES = [
 export const CORS_PROXY_BASE = CORS_PROXIES[0];
 export const YAHOO_BASE_URL = 'https://query1.finance.yahoo.com';
 export const REQUEST_TIMEOUT_MS = 8000;
+
+/**
+ * Determines if we should use the serverless API proxy.
+ * Returns true when running on Vercel (production/preview).
+ */
+function useServerProxy(): boolean {
+  // Always try server proxy first — works on both Vercel and local with `vercel dev`
+  return true;
+}
 
 // --- Interfaces ---
 
@@ -109,8 +118,22 @@ async function fetchWithFallback(path: string): Promise<Response> {
  */
 export async function fetchQuote(ticker: string): Promise<YahooQuoteResponse> {
   const normalizedTicker = normalizeTicker(ticker);
-  const path = `/v8/finance/chart/${normalizedTicker}?interval=1d&range=1d`;
 
+  // Try server proxy first (no CORS issues)
+  if (useServerProxy()) {
+    try {
+      const response = await fetch(`/api/quote?ticker=${normalizedTicker}`);
+      if (response.ok) {
+        const data = await response.json();
+        return data as YahooQuoteResponse;
+      }
+    } catch {
+      // Fall through to CORS proxy
+    }
+  }
+
+  // Fallback: CORS proxy (for local dev without vercel dev)
+  const path = `/v8/finance/chart/${normalizedTicker}?interval=1d&range=1d`;
   const response = await fetchWithFallback(path);
   const data = await response.json();
 
@@ -146,8 +169,22 @@ export async function fetchQuote(ticker: string): Promise<YahooQuoteResponse> {
  */
 export async function fetchHistorical(ticker: string): Promise<YahooHistoricalPoint[]> {
   const normalizedTicker = normalizeTicker(ticker);
-  const path = `/v8/finance/chart/${normalizedTicker}?interval=1d&range=1y`;
 
+  // Try server proxy first (no CORS issues)
+  if (useServerProxy()) {
+    try {
+      const response = await fetch(`/api/historical?ticker=${normalizedTicker}`);
+      if (response.ok) {
+        const data = await response.json();
+        return data as YahooHistoricalPoint[];
+      }
+    } catch {
+      // Fall through to CORS proxy
+    }
+  }
+
+  // Fallback: CORS proxy
+  const path = `/v8/finance/chart/${normalizedTicker}?interval=1d&range=1y`;
   const response = await fetchWithFallback(path);
   const data = await response.json();
 
@@ -191,6 +228,20 @@ export async function searchTickers(query: string): Promise<YahooSearchResult[]>
     return [];
   }
 
+  // Try server proxy first (no CORS issues)
+  if (useServerProxy()) {
+    try {
+      const response = await fetch(`/api/search?q=${encodeURIComponent(trimmedQuery)}`);
+      if (response.ok) {
+        const data = await response.json();
+        return data as YahooSearchResult[];
+      }
+    } catch {
+      // Fall through to CORS proxy
+    }
+  }
+
+  // Fallback: CORS proxy
   const path = `/v1/finance/search?q=${encodeURIComponent(trimmedQuery)}&quotesCount=8&newsCount=0`;
 
   const response = await fetchWithFallback(path);
