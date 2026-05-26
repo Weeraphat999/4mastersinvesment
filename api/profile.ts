@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-
-const YAHOO_BASE = 'https://query2.finance.yahoo.com';
+import yahooFinance from 'yahoo-finance2';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { ticker } = req.query;
@@ -12,17 +11,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const normalizedTicker = ticker.trim().toUpperCase();
 
   try {
-    // Use quoteSummary endpoint for detailed company info
-    const response = await fetch(
-      `${YAHOO_BASE}/v10/finance/quoteSummary/${normalizedTicker}?modules=price,summaryProfile,defaultKeyStatistics,financialData`
-    );
-
-    if (!response.ok) {
-      return res.status(response.status).json({ error: `Yahoo API returned ${response.status}` });
-    }
-
-    const data = await response.json();
-    const result = data?.quoteSummary?.result?.[0];
+    const result = await yahooFinance.quoteSummary(normalizedTicker, {
+      modules: ['price', 'summaryProfile', 'defaultKeyStatistics', 'financialData'],
+    });
 
     if (!result) {
       return res.status(404).json({ error: `No profile data for ${normalizedTicker}` });
@@ -35,29 +26,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=7200');
     return res.status(200).json({
-      symbol: price.symbol ?? normalizedTicker,
-      shortName: price.shortName ?? '',
-      longName: price.longName ?? '',
-      sector: profile.sector ?? '',
-      industry: profile.industry ?? '',
-      marketCap: price.marketCap?.raw ?? 0,
-      regularMarketPrice: price.regularMarketPrice?.raw ?? 0,
-      regularMarketChangePercent: price.regularMarketChangePercent?.raw ? price.regularMarketChangePercent.raw * 100 : 0,
-      fiftyTwoWeekLow: keyStats.fiftyTwoWeekLow?.raw ?? 0,
-      fiftyTwoWeekHigh: keyStats.fiftyTwoWeekHigh?.raw ?? 0,
-      trailingPE: keyStats.trailingPE?.raw ?? 0,
-      forwardPE: keyStats.forwardPE?.raw ?? 0,
-      pegRatio: keyStats.pegRatio?.raw ?? 0,
-      priceToBook: keyStats.priceToBook?.raw ?? 0,
-      profitMargins: financialData.profitMargins?.raw ?? 0,
-      debtToEquity: financialData.debtToEquity?.raw ?? 0,
-      returnOnEquity: financialData.returnOnEquity?.raw ?? 0,
-      revenueGrowth: financialData.revenueGrowth?.raw ?? 0,
-      totalRevenue: financialData.totalRevenue?.raw ?? 0,
-      totalDebt: financialData.totalDebt?.raw ?? 0,
-      totalCash: financialData.totalCash?.raw ?? 0,
-      operatingCashflow: financialData.operatingCashflow?.raw ?? 0,
-      freeCashflow: financialData.freeCashflow?.raw ?? 0,
+      symbol: (price as Record<string, unknown>).symbol ?? normalizedTicker,
+      shortName: (price as Record<string, unknown>).shortName ?? '',
+      longName: (price as Record<string, unknown>).longName ?? '',
+      sector: (profile as Record<string, unknown>).sector ?? '',
+      industry: (profile as Record<string, unknown>).industry ?? '',
+      marketCap: (price as Record<string, unknown>).marketCap ?? 0,
+      regularMarketPrice: (price as Record<string, unknown>).regularMarketPrice ?? 0,
+      regularMarketChangePercent: (price as Record<string, unknown>).regularMarketChangePercent ?? 0,
+      fiftyTwoWeekLow: (keyStats as Record<string, unknown>).fiftyTwoWeekLow ?? 0,
+      fiftyTwoWeekHigh: (keyStats as Record<string, unknown>).fiftyTwoWeekHigh ?? 0,
+      trailingPE: (keyStats as Record<string, unknown>).trailingPE ?? 0,
+      forwardPE: (keyStats as Record<string, unknown>).forwardPE ?? 0,
+      pegRatio: (keyStats as Record<string, unknown>).pegRatio ?? 0,
+      priceToBook: (keyStats as Record<string, unknown>).priceToBook ?? 0,
+      profitMargins: (financialData as Record<string, unknown>).profitMargins ?? 0,
+      debtToEquity: (financialData as Record<string, unknown>).debtToEquity ?? 0,
+      returnOnEquity: (financialData as Record<string, unknown>).returnOnEquity ?? 0,
+      revenueGrowth: (financialData as Record<string, unknown>).revenueGrowth ?? 0,
+      totalRevenue: (financialData as Record<string, unknown>).totalRevenue ?? 0,
+      totalDebt: (financialData as Record<string, unknown>).totalDebt ?? 0,
+      totalCash: (financialData as Record<string, unknown>).totalCash ?? 0,
+      operatingCashflow: (financialData as Record<string, unknown>).operatingCashflow ?? 0,
+      freeCashflow: (financialData as Record<string, unknown>).freeCashflow ?? 0,
     });
   } catch (error) {
     return res.status(500).json({ error: 'Failed to fetch profile', details: String(error) });

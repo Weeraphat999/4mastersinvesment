@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-
-const YAHOO_BASE = 'https://query1.finance.yahoo.com';
+import yahooFinance from 'yahoo-finance2';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { ticker } = req.query;
@@ -12,38 +11,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const normalizedTicker = ticker.trim().toUpperCase();
 
   try {
-    const response = await fetch(
-      `${YAHOO_BASE}/v8/finance/chart/${normalizedTicker}?interval=1d&range=1y`
-    );
+    const now = new Date();
+    const oneYearAgo = new Date(now);
+    oneYearAgo.setFullYear(now.getFullYear() - 1);
 
-    if (!response.ok) {
-      return res.status(response.status).json({ error: `Yahoo API returned ${response.status}` });
-    }
+    const result = await yahooFinance.chart(normalizedTicker, {
+      period1: oneYearAgo.toISOString().split('T')[0],
+      period2: now.toISOString().split('T')[0],
+      interval: '1d',
+    });
 
-    const data = await response.json();
-    const result = data?.chart?.result?.[0];
-
-    if (!result) {
+    if (!result || !result.quotes || result.quotes.length === 0) {
       return res.status(404).json({ error: `No historical data for ${normalizedTicker}` });
     }
 
-    const timestamps: number[] = result.timestamp ?? [];
-    const adjClose: number[] =
-      result.indicators?.adjclose?.[0]?.adjclose ??
-      result.indicators?.quote?.[0]?.close ??
-      [];
-
-    const points: { date: string; close: number }[] = [];
-
-    for (let i = 0; i < timestamps.length; i++) {
-      const closeValue = adjClose[i];
-      if (closeValue == null || isNaN(closeValue)) continue;
-
-      const date = new Date(timestamps[i] * 1000).toISOString().split('T')[0];
-      points.push({ date, close: closeValue });
-    }
-
-    points.sort((a, b) => a.date.localeCompare(b.date));
+    const points = result.quotes
+      .filter((q: Record<string, unknown>) => q.close != null && !isNaN(q.close as number))
+      .map((q: Record<string, unknown>) => ({
+        date: new Date(q.date as string).toISOString().split('T')[0],
+        close: Math.round((q.close as number) * 100) / 100,
+      }));
 
     res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=7200');
     return res.status(200).json(points);
