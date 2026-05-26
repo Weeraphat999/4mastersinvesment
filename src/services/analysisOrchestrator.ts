@@ -245,10 +245,36 @@ export async function analyzeStock(
               overviewData = mapped.overview;
               fmpSuccess = true;
               dataSource.financialsSource = 'live';
+            } else if (fmpProfile) {
+              // FMP gave us profile only — use it for overview (sector, market cap)
+              overviewData = {
+                Symbol: fmpProfile.symbol,
+                Name: fmpProfile.companyName,
+                Sector: fmpProfile.sector || '',
+                MarketCapitalization: String(fmpProfile.mktCap || 0),
+                PERatio: '0',
+                ProfitMargin: '0',
+                DebtToEquityRatio: '0',
+                PEGRatio: '0',
+                PriceToSalesRatioTTM: '0',
+              };
+
+              // Update quoteData with FMP profile info
+              if (quoteData && fmpProfile.mktCap > 0) {
+                quoteData.marketCap = fmpProfile.mktCap;
+              }
+              if (quoteData && fmpProfile.sector) {
+                quoteData.sector = fmpProfile.sector;
+              }
+
+              cacheLayer.set(normalizedTicker, 'overview', overviewData);
+              cacheLayer.set(normalizedTicker, 'fmpProfile', fmpProfileData);
+              dataSource.financialsSource = 'live';
+              fmpSuccess = true;
             }
 
             if (financialsData) cacheLayer.set(normalizedTicker, 'financials', financialsData);
-            if (overviewData) cacheLayer.set(normalizedTicker, 'overview', overviewData);
+            if (overviewData && fmpFinancials) cacheLayer.set(normalizedTicker, 'overview', overviewData);
             if (fmpProfileData) cacheLayer.set(normalizedTicker, 'fmpProfile', fmpProfileData);
           }
         }
