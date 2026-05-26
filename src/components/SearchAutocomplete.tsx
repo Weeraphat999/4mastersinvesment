@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { searchTickers } from '../services/yahooFinanceService';
+import { searchFmpTickers, isFmpConfigured } from '../services/fmpService';
 
 interface SearchAutocompleteProps {
   value: string;
@@ -25,12 +26,30 @@ const SearchAutocomplete: React.FC<SearchAutocompleteProps> = ({ value, onChange
     setIsLoading(true);
     setShowDropdown(true);
     try {
-      const searchResults = await searchTickers(query);
-      const items: AutocompleteItem[] = searchResults.map((r) => ({
-        symbol: r.symbol,
-        name: r.shortname,
-        exchange: r.exchange,
-      }));
+      let items: AutocompleteItem[] = [];
+
+      // Try FMP first (works without CORS proxy)
+      if (isFmpConfigured()) {
+        const fmpResults = await searchFmpTickers(query);
+        if (fmpResults.length > 0) {
+          items = fmpResults.map((r) => ({
+            symbol: r.symbol,
+            name: r.name,
+            exchange: r.exchange,
+          }));
+        }
+      }
+
+      // Fallback to Yahoo if FMP returned nothing
+      if (items.length === 0) {
+        const searchResults = await searchTickers(query);
+        items = searchResults.map((r) => ({
+          symbol: r.symbol,
+          name: r.shortname,
+          exchange: r.exchange,
+        }));
+      }
+
       setResults(items);
     } catch {
       setResults([]);

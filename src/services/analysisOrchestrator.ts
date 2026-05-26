@@ -11,7 +11,7 @@ import { fetchQuote, fetchHistorical } from './yahooFinanceService';
 import type { YahooQuoteResponse, YahooHistoricalPoint } from './yahooFinanceService';
 import { fetchFinancials, fetchOverview, isRateLimited } from './alphaVantageService';
 import type { AlphaVantageFinancials, AlphaVantageOverview } from './alphaVantageService';
-import { fetchFmpProfile, fetchFmpFinancials, isFmpConfigured } from './fmpService';
+import { fetchFmpProfile, fetchFmpFinancials, fetchFmpQuote, fetchFmpHistorical, isFmpConfigured } from './fmpService';
 import type { FmpProfile } from './fmpService';
 import { computeIndicators } from './technicalIndicatorEngine';
 import type { IndicatorResults } from './technicalIndicatorEngine';
@@ -95,11 +95,38 @@ export async function analyzeStock(
       quoteData = cached;
       dataSource.quoteSource = 'cached';
     } else {
-      quoteData = await fetchQuote(normalizedTicker);
-      cacheLayer.set(normalizedTicker, 'quote', quoteData);
-      dataSource.quoteSource = 'live';
+      // Try FMP first (no CORS issues)
+      if (isFmpConfigured()) {
+        const fmpQuote = await fetchFmpQuote(normalizedTicker);
+        if (fmpQuote && fmpQuote.price > 0) {
+          quoteData = {
+            symbol: fmpQuote.symbol,
+            shortName: fmpQuote.name,
+            regularMarketPrice: fmpQuote.price,
+            regularMarketChangePercent: fmpQuote.changesPercentage,
+            marketCap: fmpQuote.marketCap,
+            fiftyTwoWeekLow: fmpQuote.yearLow,
+            fiftyTwoWeekHigh: fmpQuote.yearHigh,
+            regularMarketVolume: fmpQuote.volume,
+          };
+          cacheLayer.set(normalizedTicker, 'quote', quoteData);
+          dataSource.quoteSource = 'live';
+        }
+      }
+
+      // Fallback to Yahoo if FMP failed
+      if (!quoteData) {
+        try {
+          quoteData = await fetchQuote(normalizedTicker);
+          cacheLayer.set(normalizedTicker, 'quote', quoteData);
+          dataSource.quoteSource = 'live';
+        } catch {
+          // Yahoo also failed
+          dataSource.quoteSource = 'fallback';
+        }
+      }
     }
-    stages[0].status = 'success';
+    stages[0].status = quoteData ? 'success' : 'warning';
   } catch {
     stages[0].status = 'warning';
     dataSource.quoteSource = 'fallback';
@@ -116,11 +143,28 @@ export async function analyzeStock(
       historicalData = cached;
       dataSource.historicalSource = 'cached';
     } else {
-      historicalData = await fetchHistorical(normalizedTicker);
-      cacheLayer.set(normalizedTicker, 'historical', historicalData);
-      dataSource.historicalSource = 'live';
+      // Try FMP first (no CORS issues)
+      if (isFmpConfigured()) {
+        const fmpHistorical = await fetchFmpHistorical(normalizedTicker);
+        if (fmpHistorical.length > 0) {
+          historicalData = fmpHistorical.map(p => ({ date: p.date, close: p.close }));
+          cacheLayer.set(normalizedTicker, 'historical', historicalData);
+          dataSource.historicalSource = 'live';
+        }
+      }
+
+      // Fallback to Yahoo if FMP failed
+      if (!historicalData) {
+        try {
+          historicalData = await fetchHistorical(normalizedTicker);
+          cacheLayer.set(normalizedTicker, 'historical', historicalData);
+          dataSource.historicalSource = 'live';
+        } catch {
+          dataSource.historicalSource = 'fallback';
+        }
+      }
     }
-    stages[1].status = 'success';
+    stages[1].status = historicalData && historicalData.length > 0 ? 'success' : 'warning';
   } catch {
     stages[1].status = 'warning';
     dataSource.historicalSource = 'fallback';

@@ -77,6 +77,121 @@ export function isFmpConfigured(): boolean {
   return getApiKey() !== null;
 }
 
+// --- Quote & Historical (FMP as primary source) ---
+
+export interface FmpQuote {
+  symbol: string;
+  name: string;
+  price: number;
+  changesPercentage: number;
+  marketCap: number;
+  yearLow: number;
+  yearHigh: number;
+  volume: number;
+}
+
+export interface FmpHistoricalPoint {
+  date: string;
+  close: number;
+}
+
+/**
+ * Fetches real-time quote from FMP.
+ */
+export async function fetchFmpQuote(ticker: string): Promise<FmpQuote | null> {
+  const apiKey = getApiKey();
+  if (!apiKey) return null;
+
+  const normalizedTicker = ticker.trim().toUpperCase();
+
+  try {
+    const response = await fetch(
+      `${FMP_BASE}/quote?symbol=${normalizedTicker}&apikey=${apiKey}`
+    );
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    if (!Array.isArray(data) || data.length === 0) return null;
+
+    const raw = data[0];
+    return {
+      symbol: raw.symbol ?? normalizedTicker,
+      name: raw.name ?? '',
+      price: raw.price ?? 0,
+      changesPercentage: raw.changesPercentage ?? 0,
+      marketCap: raw.marketCap ?? 0,
+      yearLow: raw.yearLow ?? 0,
+      yearHigh: raw.yearHigh ?? 0,
+      volume: raw.volume ?? 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fetches historical daily prices from FMP (1 year).
+ */
+export async function fetchFmpHistorical(ticker: string): Promise<FmpHistoricalPoint[]> {
+  const apiKey = getApiKey();
+  if (!apiKey) return [];
+
+  const normalizedTicker = ticker.trim().toUpperCase();
+
+  try {
+    const response = await fetch(
+      `${FMP_BASE}/historical-price-eod/full?symbol=${normalizedTicker}&apikey=${apiKey}`
+    );
+    if (!response.ok) return [];
+
+    const data = await response.json();
+    
+    // FMP returns { symbol, historical: [...] }
+    const historical = Array.isArray(data) ? data : (data?.historical ?? []);
+    if (!Array.isArray(historical)) return [];
+
+    // Take last 252 trading days (~1 year), sort ascending
+    const points: FmpHistoricalPoint[] = historical
+      .slice(0, 252)
+      .map((item: Record<string, unknown>) => ({
+        date: (item.date as string) ?? '',
+        close: (item.close as number) ?? 0,
+      }))
+      .filter((p: FmpHistoricalPoint) => p.close > 0)
+      .reverse(); // FMP returns newest first, we want oldest first
+
+    return points;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Searches for tickers using FMP search endpoint.
+ */
+export async function searchFmpTickers(query: string): Promise<{ symbol: string; name: string; exchange: string }[]> {
+  const apiKey = getApiKey();
+  if (!apiKey) return [];
+
+  try {
+    const response = await fetch(
+      `${FMP_BASE}/search?query=${encodeURIComponent(query)}&limit=8&apikey=${apiKey}`
+    );
+    if (!response.ok) return [];
+
+    const data = await response.json();
+    if (!Array.isArray(data)) return [];
+
+    return data.map((item: Record<string, unknown>) => ({
+      symbol: (item.symbol as string) ?? '',
+      name: (item.name as string) ?? '',
+      exchange: (item.exchangeShortName as string) ?? (item.exchange as string) ?? '',
+    }));
+  } catch {
+    return [];
+  }
+}
+
 // --- Main exports ---
 
 /**
