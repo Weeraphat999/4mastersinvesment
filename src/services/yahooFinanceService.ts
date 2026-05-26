@@ -1,14 +1,18 @@
 /**
  * Yahoo Finance API client.
  * Fetches stock quotes, historical prices, and ticker search results
- * via the corsproxy.io CORS proxy. No API key required.
+ * via CORS proxies. No API key required.
  */
 
 // --- Constants ---
 
-export const CORS_PROXY_BASE = 'https://corsproxy.io/?';
+const CORS_PROXIES = [
+  'https://corsproxy.io/?',
+  'https://api.allorigins.win/raw?url=',
+];
+export const CORS_PROXY_BASE = CORS_PROXIES[0];
 export const YAHOO_BASE_URL = 'https://query1.finance.yahoo.com';
-export const REQUEST_TIMEOUT_MS = 10000;
+export const REQUEST_TIMEOUT_MS = 8000;
 
 // --- Interfaces ---
 
@@ -58,6 +62,7 @@ export function normalizeTicker(ticker: string): string {
 
 /**
  * Performs a fetch with an AbortController timeout.
+ * Tries multiple CORS proxies as fallback.
  * Throws on non-OK responses or timeout.
  */
 async function fetchWithTimeout(url: string): Promise<Response> {
@@ -75,6 +80,27 @@ async function fetchWithTimeout(url: string): Promise<Response> {
   }
 }
 
+/**
+ * Tries fetching a Yahoo Finance path through multiple CORS proxies.
+ */
+async function fetchWithFallback(path: string): Promise<Response> {
+  const fullUrl = YAHOO_BASE_URL + path;
+  
+  for (let i = 0; i < CORS_PROXIES.length; i++) {
+    try {
+      const proxyUrl = CORS_PROXIES[i] + encodeURIComponent(fullUrl);
+      const response = await fetchWithTimeout(proxyUrl);
+      return response;
+    } catch (error) {
+      if (i === CORS_PROXIES.length - 1) {
+        throw error;
+      }
+      // Try next proxy
+    }
+  }
+  throw new Error('All CORS proxies failed');
+}
+
 // --- Public API ---
 
 /**
@@ -84,9 +110,8 @@ async function fetchWithTimeout(url: string): Promise<Response> {
 export async function fetchQuote(ticker: string): Promise<YahooQuoteResponse> {
   const normalizedTicker = normalizeTicker(ticker);
   const path = `/v8/finance/chart/${normalizedTicker}?interval=1d&range=1d`;
-  const url = buildProxyUrl(path);
 
-  const response = await fetchWithTimeout(url);
+  const response = await fetchWithFallback(path);
   const data = await response.json();
 
   // Parse the v8 chart response into our YahooQuoteResponse shape
@@ -122,9 +147,8 @@ export async function fetchQuote(ticker: string): Promise<YahooQuoteResponse> {
 export async function fetchHistorical(ticker: string): Promise<YahooHistoricalPoint[]> {
   const normalizedTicker = normalizeTicker(ticker);
   const path = `/v8/finance/chart/${normalizedTicker}?interval=1d&range=1y`;
-  const url = buildProxyUrl(path);
 
-  const response = await fetchWithTimeout(url);
+  const response = await fetchWithFallback(path);
   const data = await response.json();
 
   const result = data?.chart?.result?.[0];
@@ -168,9 +192,8 @@ export async function searchTickers(query: string): Promise<YahooSearchResult[]>
   }
 
   const path = `/v1/finance/search?q=${encodeURIComponent(trimmedQuery)}&quotesCount=8&newsCount=0`;
-  const url = buildProxyUrl(path);
 
-  const response = await fetchWithTimeout(url);
+  const response = await fetchWithFallback(path);
   const data = await response.json();
 
   const quotes = data?.quotes ?? [];

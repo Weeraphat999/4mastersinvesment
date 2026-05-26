@@ -98,8 +98,10 @@ const SearchAutocomplete: React.FC<SearchAutocompleteProps> = ({ value, onChange
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Enter stock ticker (e.g., QTUM, AAPL, NVDA)"
-        className="w-full text-xl rounded-lg p-4 border-2 border-blue-500 bg-gray-800 text-white focus:ring-2 focus:ring-blue-400 focus:outline-none transition-all duration-300"
+        placeholder="Enter ticker (e.g., AAPL, NVDA, IONQ)"
+        className="w-full text-lg sm:text-xl rounded-lg p-3 sm:p-4 border-2 border-blue-500 bg-gray-800 text-white focus:ring-2 focus:ring-blue-400 focus:outline-none transition-all duration-300"
+        autoComplete="off"
+        autoCapitalize="characters"
       />
 
       {showDropdown && (
@@ -129,7 +131,10 @@ const SearchAutocomplete: React.FC<SearchAutocompleteProps> = ({ value, onChange
               <span className="ml-2 text-gray-400">Searching...</span>
             </div>
           ) : results.length === 0 ? (
-            <div className="p-4 text-gray-400 text-center">No results found</div>
+            <div className="p-4 text-center">
+              <p className="text-gray-400 text-sm">No results found</p>
+              <p className="text-gray-500 text-xs mt-1">Press Enter to search for "{value.toUpperCase()}" directly</p>
+            </div>
           ) : (
             <ul>
               {results.map((item) => (

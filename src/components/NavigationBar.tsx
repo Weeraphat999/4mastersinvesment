@@ -3,21 +3,21 @@ import { NavLink } from 'react-router-dom';
 const NavigationBar: React.FC = () => {
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     isActive
-      ? 'bg-blue-500 rounded px-4 py-2 text-white'
-      : 'text-gray-400 hover:text-white';
+      ? 'bg-blue-500 rounded px-3 py-2 text-white text-sm sm:text-base flex items-center gap-1'
+      : 'text-gray-400 hover:text-white px-2 py-2 text-sm sm:text-base flex items-center gap-1';
 
   return (
-    <nav className="fixed top-0 w-full bg-gray-800 border-b border-gray-700 py-4 px-6 z-50 flex items-center justify-between">
-      <div className="text-xl font-bold text-white">🎯 4 Masters</div>
-      <div className="flex items-center gap-2">
+    <nav className="fixed top-0 w-full bg-gray-800 border-b border-gray-700 py-3 px-4 sm:px-6 z-50 flex items-center justify-between">
+      <div className="text-lg sm:text-xl font-bold text-white">🎯 4 Masters</div>
+      <div className="flex items-center gap-1 sm:gap-2">
         <NavLink to="/" className={linkClass} end>
-          🔍 Analyze
+          <span className="hidden sm:inline">🔍</span> Analyze
         </NavLink>
         <NavLink to="/portfolio" className={linkClass}>
-          💼 Portfolio
+          <span className="hidden sm:inline">💼</span> Portfolio
         </NavLink>
         <NavLink to="/journal" className={linkClass}>
-          📓 Journal
+          <span className="hidden sm:inline">📓</span> Journal
         </NavLink>
       </div>
     </nav>
