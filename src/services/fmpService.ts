@@ -97,6 +97,7 @@ export interface FmpHistoricalPoint {
 
 /**
  * Fetches real-time quote from FMP.
+ * Uses profile endpoint which is more reliable on free tier.
  */
 export async function fetchFmpQuote(ticker: string): Promise<FmpQuote | null> {
   const apiKey = getApiKey();
@@ -105,8 +106,9 @@ export async function fetchFmpQuote(ticker: string): Promise<FmpQuote | null> {
   const normalizedTicker = ticker.trim().toUpperCase();
 
   try {
+    // Use profile endpoint - more reliable on free tier
     const response = await fetch(
-      `${FMP_BASE}/quote?symbol=${normalizedTicker}&apikey=${apiKey}`
+      `${FMP_BASE}/profile?symbol=${normalizedTicker}&apikey=${apiKey}`
     );
     if (!response.ok) return null;
 
@@ -114,15 +116,22 @@ export async function fetchFmpQuote(ticker: string): Promise<FmpQuote | null> {
     if (!Array.isArray(data) || data.length === 0) return null;
 
     const raw = data[0];
+    const price = raw.price ?? 0;
+    const yearLow = raw.range ? parseFloat(raw.range.split('-')[0]) : 0;
+    const yearHigh = raw.range ? parseFloat(raw.range.split('-')[1]) : 0;
+
+    // Validate: if price is 0 or company name is empty, data is unreliable
+    if (price <= 0) return null;
+
     return {
       symbol: raw.symbol ?? normalizedTicker,
-      name: raw.name ?? '',
-      price: raw.price ?? 0,
-      changesPercentage: raw.changesPercentage ?? 0,
-      marketCap: raw.marketCap ?? 0,
-      yearLow: raw.yearLow ?? 0,
-      yearHigh: raw.yearHigh ?? 0,
-      volume: raw.volume ?? 0,
+      name: raw.companyName ?? '',
+      price: price,
+      changesPercentage: raw.changes ? (raw.changes / price) * 100 : 0,
+      marketCap: raw.marketCap ?? raw.mktCap ?? 0,
+      yearLow: yearLow,
+      yearHigh: yearHigh,
+      volume: raw.volAvg ?? 0,
     };
   } catch {
     return null;
@@ -142,13 +151,32 @@ export async function fetchFmpHistorical(ticker: string): Promise<FmpHistoricalP
     const response = await fetch(
       `${FMP_BASE}/historical-price-eod/full?symbol=${normalizedTicker}&apikey=${apiKey}`
     );
-    if (!response.ok) return [];
+    if (!response.ok) {
+      // Try alternative endpoint
+      const altResponse = await fetch(
+        `https://financialmodelingprep.com/api/v3/historical-price-full/${normalizedTicker}?apikey=${apiKey}`
+      );
+      if (!altResponse.ok) return [];
+      
+      const altData = await altResponse.json();
+      const altHistorical = altData?.historical ?? [];
+      if (!Array.isArray(altHistorical) || altHistorical.length === 0) return [];
+
+      return altHistorical
+        .slice(0, 252)
+        .map((item: Record<string, unknown>) => ({
+          date: (item.date as string) ?? '',
+          close: (item.close as number) ?? 0,
+        }))
+        .filter((p: FmpHistoricalPoint) => p.close > 0)
+        .reverse();
+    }
 
     const data = await response.json();
     
-    // FMP returns { symbol, historical: [...] }
+    // FMP returns { symbol, historical: [...] } or array directly
     const historical = Array.isArray(data) ? data : (data?.historical ?? []);
-    if (!Array.isArray(historical)) return [];
+    if (!Array.isArray(historical) || historical.length === 0) return [];
 
     // Take last 252 trading days (~1 year), sort ascending
     const points: FmpHistoricalPoint[] = historical
@@ -174,10 +202,18 @@ export async function searchFmpTickers(query: string): Promise<{ symbol: string;
   if (!apiKey) return [];
 
   try {
-    const response = await fetch(
+    // Try stable endpoint first
+    let response = await fetch(
       `${FMP_BASE}/search?query=${encodeURIComponent(query)}&limit=8&apikey=${apiKey}`
     );
-    if (!response.ok) return [];
+    
+    if (!response.ok) {
+      // Try v3 endpoint as fallback
+      response = await fetch(
+        `https://financialmodelingprep.com/api/v3/search?query=${encodeURIComponent(query)}&limit=8&apikey=${apiKey}`
+      );
+      if (!response.ok) return [];
+    }
 
     const data = await response.json();
     if (!Array.isArray(data)) return [];
