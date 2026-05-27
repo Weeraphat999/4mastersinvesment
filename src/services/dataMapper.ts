@@ -20,6 +20,29 @@ import type { FmpProfile, FmpFinancials } from './fmpService';
 import type { IndicatorResults } from './technicalIndicatorEngine';
 import type { GeminiAnalysisResult } from './geminiService';
 
+// --- Intrinsic Value Sanity Checks ---
+
+/**
+ * Caps intrinsic value to prevent unrealistic estimates from Gemini.
+ * For unprofitable companies, IV should not exceed 2x current price.
+ * For any company, IV should not exceed 3x current price.
+ */
+function sanitizeIntrinsicValue(rawIV: number, currentPrice: number): number {
+  if (!rawIV || !currentPrice || currentPrice <= 0) return currentPrice;
+  const maxIV = currentPrice * 3; // Hard cap at 3x current price
+  return Math.min(rawIV, maxIV);
+}
+
+/**
+ * Recalculates margin of safety from sanitized intrinsic value.
+ * Formula: ((IV - price) / IV) * 100
+ * Returns negative when price exceeds IV.
+ */
+function recalculateMarginOfSafety(intrinsicValue: number, currentPrice: number): number {
+  if (!intrinsicValue || intrinsicValue <= 0) return 0;
+  return Math.round(((intrinsicValue - currentPrice) / intrinsicValue) * 100);
+}
+
 // --- Exported interface ---
 
 export interface RawApiData {
@@ -1293,8 +1316,11 @@ export function applyGeminiToDetailedAnalysis(
       managementQuality: gemini.buffettAnalysis.managementQuality,
       valuation: {
         ...result.buffettAnalysis.valuation,
-        intrinsicValue: gemini.buffettAnalysis.intrinsicValue,
-        marginOfSafety: gemini.buffettAnalysis.marginOfSafety,
+        intrinsicValue: sanitizeIntrinsicValue(gemini.buffettAnalysis.intrinsicValue, result.buffettAnalysis.valuation.currentPrice),
+        marginOfSafety: recalculateMarginOfSafety(
+          sanitizeIntrinsicValue(gemini.buffettAnalysis.intrinsicValue, result.buffettAnalysis.valuation.currentPrice),
+          result.buffettAnalysis.valuation.currentPrice
+        ),
       },
       verdict: gemini.buffettAnalysis.verdict,
     },

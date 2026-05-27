@@ -4,6 +4,22 @@
  * Falls back to direct CORS proxy for local development.
  */
 
+import { authenticatedFetch } from './apiClient';
+
+// --- Auth Helpers ---
+
+/**
+ * Handles 401 Unauthorized responses by redirecting to the sign-in page.
+ * Returns true if the response was a 401 (caller should fall through to fallback).
+ */
+function handleUnauthorized(response: Response): boolean {
+  if (response.status === 401) {
+    window.location.href = '/signin';
+    return true;
+  }
+  return false;
+}
+
 // --- Constants ---
 
 const CORS_PROXIES = [
@@ -122,7 +138,8 @@ export async function fetchQuote(ticker: string): Promise<YahooQuoteResponse> {
   // Try server proxy first (no CORS issues)
   if (useServerProxy()) {
     try {
-      const response = await fetch(`/api/quote?ticker=${normalizedTicker}`);
+      const response = await authenticatedFetch(`/api/quote?ticker=${normalizedTicker}`);
+      if (handleUnauthorized(response)) return {} as YahooQuoteResponse;
       if (response.ok) {
         const data = await response.json();
         return data as YahooQuoteResponse;
@@ -173,7 +190,8 @@ export async function fetchHistorical(ticker: string): Promise<YahooHistoricalPo
   // Try server proxy first (no CORS issues)
   if (useServerProxy()) {
     try {
-      const response = await fetch(`/api/historical?ticker=${normalizedTicker}`);
+      const response = await authenticatedFetch(`/api/historical?ticker=${normalizedTicker}`);
+      if (handleUnauthorized(response)) return [];
       if (response.ok) {
         const data = await response.json();
         return data as YahooHistoricalPoint[];
@@ -231,7 +249,8 @@ export async function searchTickers(query: string): Promise<YahooSearchResult[]>
   // Try server proxy first (no CORS issues)
   if (useServerProxy()) {
     try {
-      const response = await fetch(`/api/search?q=${encodeURIComponent(trimmedQuery)}`);
+      const response = await authenticatedFetch(`/api/search?q=${encodeURIComponent(trimmedQuery)}`);
+      if (handleUnauthorized(response)) return [];
       if (response.ok) {
         const data = await response.json();
         return data as YahooSearchResult[];
@@ -295,7 +314,8 @@ export async function fetchProfile(ticker: string): Promise<YahooProfileData | n
   const normalizedTicker = normalizeTicker(ticker);
 
   try {
-    const response = await fetch(`/api/profile?ticker=${normalizedTicker}`);
+    const response = await authenticatedFetch(`/api/profile?ticker=${normalizedTicker}`);
+    if (handleUnauthorized(response)) return null;
     if (!response.ok) return null;
 
     const data = await response.json();

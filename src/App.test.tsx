@@ -4,6 +4,38 @@ import App from './App';
 import { getAnalysis } from './data/getAnalysis';
 import { getDetailedAnalysis } from './data/getDetailedAnalysis';
 
+// Mock the AuthContext to simulate an authenticated user for protected routes
+vi.mock('./contexts/AuthContext', () => ({
+  AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  useAuth: () => ({
+    user: { id: 'test-user-id', email: 'test@example.com' },
+    session: { access_token: 'mock-token', user: { id: 'test-user-id' } },
+    loading: false,
+    signUp: vi.fn(),
+    signIn: vi.fn(),
+    signOut: vi.fn(),
+  }),
+}));
+
+// Mock the Supabase client to prevent initialization errors in test environment
+vi.mock('./lib/supabase', () => ({
+  supabase: {
+    auth: {
+      getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
+      onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
+    },
+    from: vi.fn(() => ({
+      select: vi.fn().mockReturnThis(),
+      insert: vi.fn().mockReturnThis(),
+      update: vi.fn().mockReturnThis(),
+      delete: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: null, error: null }),
+    })),
+  },
+}));
+
 // Mock yahooFinanceService to prevent real API calls from SearchAutocomplete
 vi.mock('./services/yahooFinanceService', () => ({
   searchTickers: vi.fn(() => Promise.resolve([])),
@@ -45,12 +77,14 @@ describe('App integration - state transitions', () => {
   beforeEach(() => {
     // Mock scrollIntoView since jsdom doesn't implement it
     Element.prototype.scrollIntoView = vi.fn();
+    // Navigate to the /analyze route (protected, but auth is mocked)
+    window.history.pushState({}, '', '/analyze');
   });
 
   it('search flow: enter ticker → press Enter → results appear with correct data', async () => {
     render(<App />);
 
-    const input = screen.getByPlaceholderText('Enter stock ticker (e.g., QTUM, AAPL, NVDA)');
+    const input = screen.getByPlaceholderText('Enter ticker (e.g., AAPL, NVDA, IONQ)');
     fireEvent.change(input, { target: { value: 'AAPL' } });
     fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
 
@@ -58,8 +92,8 @@ describe('App integration - state transitions', () => {
     await waitFor(() => {
       expect(screen.getByText('AAPL - Apple Inc.')).toBeInTheDocument();
     });
-    // Search input should no longer be visible
-    expect(screen.queryByPlaceholderText('Enter stock ticker (e.g., QTUM, AAPL, NVDA)')).not.toBeInTheDocument();
+    // Search input remains visible (always-visible search bar)
+    expect(screen.getByPlaceholderText('Enter ticker (e.g., AAPL, NVDA, IONQ)')).toBeInTheDocument();
   });
 
   it('example button flow: click QTUM → results appear', async () => {
@@ -74,7 +108,7 @@ describe('App integration - state transitions', () => {
     });
   });
 
-  it('new search flow: click New Search → returns to search view', async () => {
+  it('new search flow: type new ticker in search bar → clears results and shows search view', async () => {
     render(<App />);
 
     // First trigger a search
@@ -86,12 +120,11 @@ describe('App integration - state transitions', () => {
       expect(screen.getByText('QTUM - IonQ Inc.')).toBeInTheDocument();
     });
 
-    // Click New Search
-    const newSearchButton = screen.getByRole('button', { name: 'New Search' });
-    fireEvent.click(newSearchButton);
+    // Type a new value in the always-visible search bar to trigger new search view
+    const input = screen.getByPlaceholderText('Enter ticker (e.g., AAPL, NVDA, IONQ)');
+    fireEvent.change(input, { target: { value: 'AAPL' } });
 
-    // Should return to search view
-    expect(screen.getByPlaceholderText('Enter stock ticker (e.g., QTUM, AAPL, NVDA)')).toBeInTheDocument();
+    // Results should be cleared when user starts typing
     expect(screen.queryByText('QTUM - IonQ Inc.')).not.toBeInTheDocument();
   });
 
@@ -99,7 +132,7 @@ describe('App integration - state transitions', () => {
     const { unmount } = render(<App />);
 
     // Search with lowercase
-    const input = screen.getByPlaceholderText('Enter stock ticker (e.g., QTUM, AAPL, NVDA)');
+    const input = screen.getByPlaceholderText('Enter ticker (e.g., AAPL, NVDA, IONQ)');
     fireEvent.change(input, { target: { value: 'qtum' } });
     fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
 
@@ -112,7 +145,7 @@ describe('App integration - state transitions', () => {
 
     // Now search with uppercase
     render(<App />);
-    const input2 = screen.getByPlaceholderText('Enter stock ticker (e.g., QTUM, AAPL, NVDA)');
+    const input2 = screen.getByPlaceholderText('Enter ticker (e.g., AAPL, NVDA, IONQ)');
     fireEvent.change(input2, { target: { value: 'QTUM' } });
     fireEvent.keyDown(input2, { key: 'Enter', code: 'Enter' });
 
@@ -147,7 +180,7 @@ describe('App integration - state transitions', () => {
     fireEvent.click(qtumButton);
 
     await waitFor(() => {
-      expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: 'smooth' });
+      expect(scrollIntoViewMock).toHaveBeenCalledWith(expect.objectContaining({ behavior: 'smooth' }));
     });
   });
 });

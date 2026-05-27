@@ -17,14 +17,14 @@ describe('TabBar', () => {
     expect(tabs[2]).toHaveTextContent('Lynch');
     expect(tabs[3]).toHaveTextContent('Rothschild');
     expect(tabs[4]).toHaveTextContent('Technical');
-    expect(tabs[5]).toHaveTextContent('⚡ Actions');
+    expect(tabs[5]).toHaveTextContent('Actions');
   });
 
   it('applies active styling classes to the active tab', () => {
     render(<TabBar {...defaultProps} activeTab="buffett" />);
     const tabs = screen.getAllByRole('tab');
     const activeTab = tabs[0];
-    expect(activeTab).toHaveClass('bg-blue-500', 'text-white', 'font-bold', 'border-b-4', 'border-blue-400');
+    expect(activeTab).toHaveClass('bg-blue-500', 'text-white', 'font-semibold', 'shadow-md');
   });
 
   it('applies inactive styling classes to non-active tabs', () => {
@@ -56,7 +56,7 @@ describe('TabBar', () => {
     render(<TabBar activeTab="technical" onTabChange={defaultProps.onTabChange} />);
     const tabs = screen.getAllByRole('tab');
     // Technical tab (index 4) should be active
-    expect(tabs[4]).toHaveClass('bg-blue-500', 'text-white', 'font-bold');
+    expect(tabs[4]).toHaveClass('bg-blue-500', 'text-white', 'font-semibold');
     // Buffett tab (index 0) should be inactive
     expect(tabs[0]).toHaveClass('text-gray-400');
     expect(tabs[0]).not.toHaveClass('bg-blue-500');

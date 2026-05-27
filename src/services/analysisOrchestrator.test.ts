@@ -16,6 +16,15 @@ vi.mock('./alphaVantageService');
 vi.mock('./fmpService');
 vi.mock('./technicalIndicatorEngine');
 
+// Mock the Supabase client to prevent initialization errors in test environment
+vi.mock('../lib/supabase', () => ({
+  supabase: {
+    auth: {
+      getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
+    },
+  },
+}));
+
 // Mock dataMapper — let it use real fallback logic
 vi.mock('./dataMapper', () => ({
   mapToAnalysisResult: vi.fn((_ticker: string) => ({

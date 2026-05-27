@@ -20,26 +20,30 @@ describe('AnalysisTabs', () => {
 
   it('renders Munger content when Munger tab is clicked', () => {
     render(<AnalysisTabs data={mockData} masterScores={mockScores} analysisResult={mockAnalysisResult} />);
-    fireEvent.click(screen.getByRole('tab', { name: 'Munger' }));
+    const tabs = screen.getAllByRole('tab');
+    fireEvent.click(tabs[1]); // Munger
     expect(screen.getByText('🧠 Charlie Munger Analysis')).toBeInTheDocument();
     expect(screen.queryByText('🎩 Warren Buffett Analysis')).not.toBeInTheDocument();
   });
 
   it('renders Lynch content when Lynch tab is clicked', () => {
     render(<AnalysisTabs data={mockData} masterScores={mockScores} analysisResult={mockAnalysisResult} />);
-    fireEvent.click(screen.getByRole('tab', { name: 'Lynch' }));
+    const tabs = screen.getAllByRole('tab');
+    fireEvent.click(tabs[2]); // Lynch
     expect(screen.getByText('🔍 Peter Lynch Analysis')).toBeInTheDocument();
   });
 
   it('renders Rothschild content when Rothschild tab is clicked', () => {
     render(<AnalysisTabs data={mockData} masterScores={mockScores} analysisResult={mockAnalysisResult} />);
-    fireEvent.click(screen.getByRole('tab', { name: 'Rothschild' }));
+    const tabs = screen.getAllByRole('tab');
+    fireEvent.click(tabs[3]); // Rothschild
     expect(screen.getByText('🌍 Rothschild Timing Analysis')).toBeInTheDocument();
   });
 
   it('renders Technical content when Technical tab is clicked', () => {
     render(<AnalysisTabs data={mockData} masterScores={mockScores} analysisResult={mockAnalysisResult} />);
-    fireEvent.click(screen.getByRole('tab', { name: 'Technical' }));
+    const tabs = screen.getAllByRole('tab');
+    fireEvent.click(tabs[4]); // Technical
     expect(screen.getByText('📈 Technical Analysis')).toBeInTheDocument();
   });
 
@@ -54,7 +58,8 @@ describe('AnalysisTabs', () => {
     expect(screen.queryByText('📈 Technical Analysis')).not.toBeInTheDocument();
 
     // Switch to Lynch - only Lynch visible
-    fireEvent.click(screen.getByRole('tab', { name: 'Lynch' }));
+    const tabs = screen.getAllByRole('tab');
+    fireEvent.click(tabs[2]); // Lynch
     expect(screen.queryByText('🎩 Warren Buffett Analysis')).not.toBeInTheDocument();
     expect(screen.queryByText('🧠 Charlie Munger Analysis')).not.toBeInTheDocument();
     expect(screen.getByText('🔍 Peter Lynch Analysis')).toBeInTheDocument();
@@ -69,7 +74,8 @@ describe('AnalysisTabs', () => {
     expect(screen.getByText('🎩 Warren Buffett Analysis')).toBeInTheDocument();
 
     // Click Buffett again
-    fireEvent.click(screen.getByRole('tab', { name: 'Buffett' }));
+    const tabs = screen.getAllByRole('tab');
+    fireEvent.click(tabs[0]);
 
     // Content should remain unchanged
     expect(screen.getByText('🎩 Warren Buffett Analysis')).toBeInTheDocument();

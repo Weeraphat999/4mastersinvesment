@@ -1,6 +1,6 @@
 import { DecisionEntry } from '../data/types';
 
-const sampleDecisions: DecisionEntry[] = [
+export const sampleDecisions: DecisionEntry[] = [
   {
     id: 'seed-1',
     date: '2025-01-15T10:30:00.000Z',

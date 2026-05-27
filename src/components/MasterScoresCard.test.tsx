@@ -15,10 +15,10 @@ describe('MasterScoresCard unit tests', () => {
     const { container } = render(
       <MasterScoresCard scores={defaultScores} overallScore={7.9} />
     );
-    expect(container.querySelector('.bg-blue-500')).not.toBeNull();
-    expect(container.querySelector('.bg-purple-500')).not.toBeNull();
-    expect(container.querySelector('.bg-green-500')).not.toBeNull();
-    expect(container.querySelector('.bg-yellow-500')).not.toBeNull();
+    expect(container.querySelector('.from-blue-400')).not.toBeNull();
+    expect(container.querySelector('.from-purple-400')).not.toBeNull();
+    expect(container.querySelector('.from-green-400')).not.toBeNull();
+    expect(container.querySelector('.from-yellow-400')).not.toBeNull();
   });
 
   it('displays all master names', () => {

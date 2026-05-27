@@ -7,6 +7,12 @@ vi.mock('../services/yahooFinanceService', () => ({
   searchTickers: vi.fn(),
 }));
 
+// Mock the fmpService
+vi.mock('../services/fmpService', () => ({
+  searchFmpTickers: vi.fn().mockResolvedValue([]),
+  isFmpConfigured: vi.fn().mockReturnValue(false),
+}));
+
 import { searchTickers } from '../services/yahooFinanceService';
 
 const mockSearchTickers = vi.mocked(searchTickers);
@@ -25,7 +31,7 @@ describe('SearchAutocomplete', () => {
   it('renders the input with correct placeholder', () => {
     render(<SearchAutocomplete {...defaultProps} />);
     expect(
-      screen.getByPlaceholderText('Enter stock ticker (e.g., QTUM, AAPL, NVDA)')
+      screen.getByPlaceholderText('Enter ticker (e.g., AAPL, NVDA, IONQ)')
     ).toBeInTheDocument();
   });
 

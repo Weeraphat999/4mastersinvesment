@@ -323,8 +323,12 @@ describe('dataMapper', () => {
 
       expect(result.technicalAnalysis.chartData.pricePoints.length).toBe(mockHistorical.length);
       expect(result.technicalAnalysis.chartData.pricePoints[0]).toBe(125.07);
-      expect(result.technicalAnalysis.chartData.supportLevel).toBeCloseTo(125.07, 1);
-      expect(result.technicalAnalysis.chartData.resistanceLevel).toBeCloseTo(195.60, 1);
+      // Support is 20th percentile of sorted prices, resistance is 80th percentile
+      const sortedPrices = [...mockHistorical.map(p => p.close)].sort((a, b) => a - b);
+      const p20Index = Math.floor(sortedPrices.length * 0.2);
+      const p80Index = Math.floor(sortedPrices.length * 0.8);
+      expect(result.technicalAnalysis.chartData.supportLevel).toBeCloseTo(sortedPrices[p20Index], 1);
+      expect(result.technicalAnalysis.chartData.resistanceLevel).toBeCloseTo(sortedPrices[p80Index], 1);
     });
 
     it('maps indicators → TechnicalAnalysis.signals', () => {

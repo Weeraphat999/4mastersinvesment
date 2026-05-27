@@ -180,6 +180,8 @@ CRITICAL INSTRUCTIONS:
 - If Buffett score is 0, the moat score should also be low (0-3). Scores must be internally consistent. A company cannot have a 0/10 Buffett score but 6/10 moat.
 - Ensure scores are internally consistent. If overall Buffett score is low, individual components (moat, management) should also reflect that.
 - The Rothschild optimal entry levels MUST be relative to the current stock price of $${price.toFixed(2)}. Best entry should be 10-20% below current price, Good entry 5-10% below, OK entry near current price.
+- INTRINSIC VALUE RULES: Use a conservative DCF or earnings-based valuation. For profitable companies, use P/E * earnings or DCF with 10% discount rate. For unprofitable companies (negative net income or P/E = 0), use revenue-based multiples (1-5x revenue/shares) capped at a MAXIMUM of 2x current price. NEVER estimate intrinsic value more than 3x the current stock price. If the company has no earnings, intrinsic value should typically be BELOW or near the current price.
+- MARGIN OF SAFETY: Calculate as ((intrinsicValue - currentPrice) / intrinsicValue) * 100. If intrinsic value is below current price, margin of safety must be NEGATIVE.
 
 Analyze this stock from these 4 perspectives:
 

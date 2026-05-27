@@ -1,9 +1,13 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import YahooFinance from 'yahoo-finance2';
+import { verifyAuth } from './_middleware/auth';
 
 const yahooFinance = new YahooFinance();
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const userId = await verifyAuth(req, res);
+  if (!userId) return;
+
   const { q } = req.query;
 
   if (!q || typeof q !== 'string') {
